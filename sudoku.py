@@ -9,6 +9,7 @@ pygame.display.set_caption("Sudoku")
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 GREY = (220, 220, 220)
+YELLOW = (255, 255, 237)
 
 class Button():
     #width and height will only be passed in for buttons with no text (images and plain buttons)
@@ -38,8 +39,6 @@ class Button():
         self.x = x
         self.y = y
         
-        
-        
         if self.image != None: #We want an image button
             img = pygame.image.load(self.image)
             img = pygame.transform.scale(img, (self.width, self.height))
@@ -60,10 +59,19 @@ class Button():
         return False
 
 class Sudoku:
-    def __init__(self, grid, gridSize):
+    def __init__(self, grid, gridSize, lineThickness=1):
         self.grid = grid
         self.gridSize = gridSize
         self.squareSize = gridSize//9
+        self.lineThickness = lineThickness
+        self.currentHighLightedSquare = None #Initially, no squares should be highlighted
+        self.squareSelected = False #Initially, no squares should be selected
+        
+        self.verticalOffset = (windowSize[0] - self.gridSize) // 2 #distance from the vertical edge of the screen to the vertical edge of the grid
+        self.horizontalOffset = (windowSize[1] - self.gridSize) // 2 #distance from the horizontal edge of the screen to the horizontal edge of the grid
+        
+        self.xLeft, self.xRight = self.verticalOffset, windowSize[0]-self.verticalOffset
+        self.yTop, self.yBottom = self.horizontalOffset, windowSize[1]-self.horizontalOffset
     
     def isPossible(self):
         pass
@@ -82,31 +90,58 @@ class Sudoku:
     
     def draw(self):
         screen.fill(GREY)
-        verticalOffset = (windowSize[0] - self.gridSize) // 2 #distance from the vertical edge of the screen to the vertical edge of the grid
-        horizontalOffset = (windowSize[1] - self.gridSize) // 2
         
-        self.xLeft, self.xRight = verticalOffset, windowSize[0]-verticalOffset
-        self.yTop, self.yBottom = horizontalOffset, windowSize[1]-horizontalOffset
-        
+        #Start drawing at the top left of the grid
         currentXPosition = self.xLeft #start from the left of the grid
-        destinationXPosition = self.xRight
         currentYPosition = self.yTop
+        
+        #Where do we want to go? To the right and down
+        destinationXPosition = self.xRight
         destinationYPosition = self.yBottom
         
-        #horizontal      
+        #horizontal lines     
         for x in range(10): #10 lines needed to produce 9 boxes
             colour = BLACK if x % 3 == 0 else WHITE
-            pygame.draw.line(screen, colour, (currentXPosition, currentYPosition), (destinationXPosition, currentYPosition), 1) #horizontal line
-            
-            currentYPosition += self.squareSize
+            pygame.draw.line(screen, colour, (currentXPosition, currentYPosition), (destinationXPosition, currentYPosition), self.lineThickness) #horizontal line
+            currentYPosition += self.squareSize #move on to the next horizontal line, down the grid
 
-        #vertical
+        #vertical lines
         currentYPosition = self.yTop #reset currentYPosition
         for y in range(10): #10 lines needed to produce 9 boxes
             colour = BLACK if y % 3 == 0 else WHITE
-            pygame.draw.line(screen, colour, (currentXPosition, currentYPosition), (currentXPosition, destinationYPosition), 1) #vertical line
-            currentXPosition += self.squareSize
+            pygame.draw.line(screen, colour, (currentXPosition, currentYPosition), (currentXPosition, destinationYPosition), self.lineThickness) #vertical line
+            currentXPosition += self.squareSize #move on to the next vertical line, to the right of the grid
     
+    def highlight(self, gridCoordinate):
+        
+        #the new highlight
+        top = int(self.yTop + (gridCoordinate[1] * self.squareSize))
+        left = int(self.xLeft + (gridCoordinate[0] * self.squareSize))
+        region = pygame.Rect(left+self.lineThickness, top+self.lineThickness, self.squareSize-self.lineThickness, self.squareSize-self.lineThickness) #the square to cover with blue
+        screen.fill(YELLOW, rect=region)
+        
+        self.currentHighLightedSquare = region
+        self.squareSelected = True
+        
+    def unhighlight(self):
+        if self.currentHighLightedSquare: #if a square is currently highlighted already,
+            screen.fill(GREY, rect=self.currentHighLightedSquare)
+        self.currentHighLightedSquare = None
+        self.squareSelected = False #a square is no longer selected
+    
+        #Something like (431.9, 221.2) to (6, 5)
+    def screenCoordinateToGridCoordinate(self, mousePosition):
+        mouseX, mouseY = mousePosition
+        #if the location clicked is outside the grid
+        if not (mouseX > self.xLeft and mouseX < self.xRight and mouseY > self.yTop and mouseY < self.yBottom):
+            return False
+            self.squareSelected = False
+        else: #must be inside the grid, so find the corresponding coordinate.
+            row = (mouseX - self.xLeft) // ((self.xRight - self.xLeft)/9)  #calculate the row number from 0 - 8
+            col = (mouseY - self.yTop) // ((self.yBottom - self.yTop)/9)  #calculate the col number from 0 - 8
+            return int(row), int(col)
+            self.squareSelected = True
+        
 def run():
     global grid
     grid = [
@@ -123,13 +158,33 @@ def run():
     
     mySudoku = Sudoku(grid, 540) #for best results, should be a multiple of 9
     mySudoku.draw()
+    
+    print(f"Each little square is {mySudoku.squareSize} big.")
+    print(f"The top left of the square is at {mySudoku.xLeft}, {mySudoku.yTop}")
+    print(f"The bottom right of the square is at {mySudoku.xRight}, {mySudoku.yBottom}")
 
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
+            
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                mousePosition = pygame.mouse.get_pos()
+                coordinates = mySudoku.screenCoordinateToGridCoordinate(mousePosition)
+                print(coordinates)
+                
+                if coordinates: #if the place clicked is INSIDE the grid, then
+                    mySudoku.unhighlight()
+                    mySudoku.highlight(coordinates) #highlight the new square
+                else: #coordinates == False and the place is OUTSIDE the grid
+                    mySudoku.unhighlight() #unhighlight
+                    
+            if event.type == pygame.KEYDOWN:
+                if event.unicode.isnumeric() and mySudoku.squareSelected:
+                    print(event.unicode)
 
+                
         pygame.display.update()
 if __name__ == "__main__":
     run()
