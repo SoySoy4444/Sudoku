@@ -1,4 +1,4 @@
-import pygame, sys, numpy, copy
+import pygame, sys, copy, time
 
 pygame.init()
 global windowSize, screen
@@ -12,14 +12,58 @@ GREY = (220, 220, 220)
 YELLOW = (255, 255, 237)
 RED = (255, 0, 0)
 
+clock = pygame.time.Clock()
+
+def fade(width, height, alpha=95, colour=WHITE):
+    fade = pygame.Surface((width, height))
+    fade.fill(colour)
+    fade.set_alpha(alpha)
+    screen.blit(fade, (0, 0))
+
+def pause(seconds = None):
+    paused = True
+    startTime = time.time()
+    currentScreen = screen.copy()
+    
+    if seconds == None: #display "Paused" message indefinitely until the user presses c.
+        fade(windowSize[0], windowSize[1]) #make the screen look whitish
+        pauseMessage = Message("Paused", 48)
+        pauseMessage.blit(screen, ("horizontalCentre", "verticalCentre"))
+
+    while paused:
+        clock.tick(2)
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_c: #if c pressed, continue playing
+                    screen.blit(currentScreen, (0, 0))
+                    paused = False
+                    
+        if seconds != None and time.time() - startTime > seconds:
+            paused = False
+        pygame.display.update()
+
+class Message():
+    def __init__(self, text, fontSize, fontStyle = "arialunicodettf", textColour = BLACK, backgroundColour = WHITE):        
+        font = pygame.font.SysFont(fontStyle, fontSize)
+        self.myText = font.render(text, 1, textColour, backgroundColour)
+        self.width, self.height = self.myText.get_size()[0], self.myText.get_size()[1]
+
+    def blit(self, screen, pos):
+        self.x = windowSize[0]//2 - self.width//2 if pos[0] == "horizontalCentre" else pos[0]
+        self.y = windowSize[1]//2 - self.height//2 if pos[1] == "verticalCentre" else pos[1]
+        screen.blit(self.myText, (self.x, self.y))
+
 class Button():
     #width and height will only be passed in for buttons with no text (images and plain buttons)
     #windowSize will only be passed in if width="horizontalCentre" or height="verticalCentre"
-    def __init__(self, color, text='', textColour = BLACK, image = None, fontSize=48, width=None, height=None, widthScale=1):
+    def __init__(self, color, text='', textColour = BLACK, fontSize=48, width=None, height=None, widthScale=1):
         self.color = color
         self.text = text
         self.textColour = textColour
-        self.image = image
         self.fontSize = fontSize
         
         self.widthScale = widthScale
@@ -40,17 +84,12 @@ class Button():
         self.x = x
         self.y = y
         
-        if self.image != None: #We want an image button
-            img = pygame.image.load(self.image)
-            img = pygame.transform.scale(img, (self.width, self.height))
-            screen.blit(img, (self.x, self.y))
-        else:
-            pygame.draw.rect(screen, self.color, (self.x, self.y, self.width, self.height), 0)
+        pygame.draw.rect(screen, self.color, (self.x, self.y, int(self.width), int(self.height)), 0)
         
         if self.text != '': #We want text displayed on our button
             arialFont = pygame.font.SysFont("arialunicodettf", self.fontSize)
             text = arialFont.render(self.text, 1, self.textColour)
-            screen.blit(text, (self.x + (self.width/2 - text.get_width()/2), self.y + (self.height/2 - text.get_height()/2)))
+            screen.blit(text, (int(self.x + (self.width//2 - text.get_width()//2)), int(self.y + (self.height//2 - text.get_height()//2))))
 
     def isMouseHover(self, mousePos):
         #Pos is the mouse position or a tuple of (x,y) coordinates
@@ -84,24 +123,24 @@ class Sudoku:
             arialFont = pygame.font.SysFont("arialunicodettf", self.fontSize)
             fontWidth, fontHeight = arialFont.size("0")
             self.fontSize -= 1
-        print("Font size found: ", self.fontSize)
+        #print("Font size found: ", self.fontSize)
     
     #Used for solving only
     #accepts a GRID coordinate like 7, 6. Checks if it is valid to play a number N at x, y.
-    def isPossible(self, y, x, n):
+    def isValid(self, board, y, x, n):
         #check along the y axis
-        if n in grid[y]:
+        if n in board[y]:
             return False
         
         #check along the x axis
-        for row in grid:
+        for row in board:
             if row[x] == n:
                 return False
         
         #check for the 3x3 square
         startRow = y - (y % 3)
         startCol = x - (x % 3)
-        for row in grid[startRow:startRow+3]:
+        for row in board[startRow:startRow+3]:
             for number in row[startCol:startCol+3]:
                 if number == n:
                     return False
@@ -134,15 +173,57 @@ class Sudoku:
             return False
         
         return True
+    
+    """
+    #recursive function, backtracking.
+    def solve(self):
+        for row in range(9):
+            for col in range(9):
+                if self.solvedGrid[row][col] == 0: #for each unsolved square (unsolved square == 0)
+                    for i in range(1, 10): #test numbers from 1 - 9
+                        if self.isValid(row, col, i): #when we reach a number that is possible
+                            self.solvedGrid[row][col] = i #set the square to that number regardless of whether it is correct or not
+                            self.solve() #recursion
+                            self.solvedGrid[row][col] = 0
+                    return
+    
+    def getAnswer(self):#, animation=False): #Specify whether to display how it was solved
+        self.solvedGrid = copy.deepcopy(self.originalGrid)
+        self.solve()
+        return self.solvedGrid
+"""
+
+    def solve(self):
+        emptySquare = self.nextEmptySquare()
+        if not emptySquare: #no more empty squares, finished solving so return the solved grid back to getAnswer()
+            return self.solvedGrid
+        else:
+            row, col = self.nextEmptySquare()
         
-    def solve(self, animation=False): #Specify whether to display how it was solved
-        return grid
+            for i in range(1, 10):
+                if self.isValid(self.solvedGrid, row, col, i):
+                    self.solvedGrid[row][col] = i
+                    if self.solve():
+                        return self.solvedGrid #keep returning the board as long as the current board is valid
+                    self.solvedGrid[row][col] = 0 #as soon as the current board becomes impossible to solve, backtrack
+            return False
+    
+    def nextEmptySquare(self):
+        for row in range(9):
+            for col in range(9):
+                if self.solvedGrid[row][col] == 0: #for each unsolved square (unsolved square == 0)
+                    return row, col #return next empty square
+        return False #no more empty squares, finished solving!
+    
+    def getAnswer(self):
+        self.solvedGrid = copy.deepcopy(self.originalGrid)
+        self.solvedGrid = self.solve()
+        return self.solvedGrid
     
     def check(self):
         for row in range(9):
             for col in range(9):
                 if not self.noDuplicates(row, col, grid[row][col]):
-                    print(row, col, grid[row][col])
                     return False
         return True
     
@@ -152,7 +233,7 @@ class Sudoku:
     def generate(self):
         pass
     
-    def draw(self):
+    def draw(self, board):
         screen.fill(GREY)
         
         #Start drawing at the top left of the grid
@@ -178,17 +259,15 @@ class Sudoku:
     
         for row in range(9):
             for col in range(9):
-                if self.grid[col][row] != 0: #num is one of the original clues
+                if board[col][row] != 0: #num is one of the original clues
                     top = int(self.yTop + (col * self.squareSize))
                     left = int(self.xLeft + (row * self.squareSize))
                     
                     region = pygame.Rect(left+self.lineThickness, top+self.lineThickness, self.squareSize-self.lineThickness, self.squareSize-self.lineThickness) #the square to cover with blue
                     self.currentHighLightedSquare = region
-                    self.addNumber(str(self.grid[col][row]), colour=RED)
+                    self.addNumber(str(board[col][row]), colour=RED)
         
         self.currentHighLightedSquare = None
-        matrix = numpy.matrix(self.grid)
-        print(matrix)
     
     #accepts a GRID coordinate like 4, 1
     def highlight(self, gridCoordinate):
@@ -238,7 +317,6 @@ class Sudoku:
         if number == "": #if user pressed BACKSPACE
             number = "0" #reset the square to 0
         grid[y][x] = int(number) #TODO: Opposite is better. Check why.
-        print(number)
         if number == "0": #backspace
             number = " "
         
@@ -258,6 +336,7 @@ class Sudoku:
         
 def run():
     global grid
+    """
     grid = [
         #C                        C
         #O                        O
@@ -273,19 +352,40 @@ def run():
         [2, 4, 8, 9, 5, 7, 1, 3, 6],
         [7, 6, 3, 4, 1, 8, 2, 5, 9],        #ROW 8
     ]
+
+    grid = [
+        [0, 0, 0, 2, 6, 0, 7, 0, 1],
+        [6, 8, 0, 0, 7, 1, 0, 9, 0],
+        [1, 9, 0, 0, 0, 4, 5, 0, 0],
+        [8, 2, 0, 1, 0, 0, 0, 4, 0],
+        [0, 0, 4, 6, 0, 2, 9, 0, 0],
+        [0, 5, 0, 0, 0, 3, 0, 2, 8],
+        [0, 0, 9, 3, 0, 0, 0, 7, 4],
+        [0, 4, 0, 0, 5, 0, 0, 3, 6],
+        [7, 0, 3, 0, 1, 8, 0, 0, 0],
+    ]
+    """
+    
+    grid = [
+        [0, 3, 5, 2, 6, 9, 7, 8, 1],
+        [6, 8, 2, 0, 7, 1, 0, 9, 3],
+        [1, 9, 0, 8, 3, 4, 5, 6, 2],
+        [8, 2, 6, 1, 9, 5, 3, 0, 7],
+        [3, 7, 4, 0, 8, 2, 9, 1, 5],
+        [9, 5, 1, 7, 4, 3, 6, 2, 8],
+        [5, 1, 9, 0, 2, 6, 8, 7, 4],
+        [2, 4, 0, 9, 5, 7, 1, 3, 6],
+        [7, 6, 3, 4, 1, 8, 2, 5, 9],
+    ]
     
     mySudoku = Sudoku(grid, 540) #for best results, should be a multiple of 9
-    mySudoku.draw()
+    mySudoku.draw(grid)
     
     #assert mySudoku.isPossible(0, 2, 9) == False, "it's false by horizontal!"
     #assert mySudoku.isPossible(0, 2, 1) == True, "it's true by horizontal!"
     #assert mySudoku.isPossible(3, 3, 4) == True
     #assert mySudoku.isPossible(3, 3, 6) == False, "it's false by vertical!"
     #print(mySudoku.isPossible(8, 8, 6))
-
-    print(f"Each little square is {mySudoku.squareSize} big.")
-    print(f"The top left of the square is at {mySudoku.xLeft}, {mySudoku.yTop}")
-    print(f"The bottom right of the square is at {mySudoku.xRight}, {mySudoku.yBottom}")
     
     solveButton = Button(WHITE, text="Solve", fontSize = 24, widthScale=1.5)
     solveButton.draw(200, 680)
@@ -296,7 +396,11 @@ def run():
     generateButton = Button(WHITE, text="Generate", fontSize = 24, widthScale=1.5)
     generateButton.draw(300, 50)
     
+    newGameButton = Button(WHITE, text="New Game", fontSize = 24, widthScale=1.5)
+    newGameButton.draw(20, 20)
+    
     while True:
+        clock.tick(30)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
@@ -313,9 +417,12 @@ def run():
                     mySudoku.unhighlight() #unhighlight
 
                 if solveButton.isMouseHover(mousePosition):
-                    #grid = mySudoku.solve()
-                    #print(grid)
-                    pass
+                    screen.fill(GREY)
+                    
+                    solvedGrid = mySudoku.getAnswer()
+                    mySudoku.draw(solvedGrid)
+                    newGameButton.draw(20, 20)
+                
                 if checkButton.isMouseHover(mousePosition):
                     #check if all squares have been filled
                     filled = True
@@ -326,20 +433,33 @@ def run():
                                 break
                         if not filled:
                             break
-                        
-                    print("Filled: ", filled)
-                    #TODO: If filled is True, mySudoku.check()
+                    
                     if filled:
                         if mySudoku.check():
-                            print("Congratulations! That is correct!")
+                            
+                            currentScreen = screen.copy()
+                            
+                            gameEndMessage = Message("Well done!", 48)
+                            gameEndMessage.blit(screen, ("horizontalCentre", "verticalCentre"))
+                            pause(seconds=2)
+                            screen.blit(currentScreen, (0, 0))
                         else:
-                            print("Try again.")
-                    
+                            currentScreen = screen.copy()
+                            
+                            tryAgainMessage = Message("Incorrect. Try again", 48)
+                            tryAgainMessage.blit(screen, ("horizontalCentre", "verticalCentre"))
+                            pause(seconds=2)
+                            screen.blit(currentScreen, (0, 0))
+                
+                if newGameButton.isMouseHover(mousePosition):
+                    run()
+                
             if event.type == pygame.KEYDOWN:
                 if (event.unicode.isnumeric() or event.key == pygame.K_BACKSPACE) and mySudoku.squareSelected and event.unicode != "0" and not mySudoku.originalSquare():
                     mySudoku.addNumber(event.unicode)
-                    print(grid)
-
+                    
+                if event.key == pygame.K_p: #if p pressed, pause
+                    pause()
                 
         pygame.display.update()
 if __name__ == "__main__":
