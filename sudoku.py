@@ -86,6 +86,7 @@ class Sudoku:
             self.fontSize -= 1
         print("Font size found: ", self.fontSize)
     
+    #Used for solving only
     #accepts a GRID coordinate like 7, 6. Checks if it is valid to play a number N at x, y.
     def isPossible(self, y, x, n):
         #check along the y axis
@@ -105,10 +106,45 @@ class Sudoku:
                 if number == n:
                     return False
         return True
+    
+    #Used for checking only
+    #Unlike isPossible, it doesn't check if it can add at a certain location, but it checks if the square is valid. 
+    def noDuplicates(self, y, x, n):
+        #check along the y axis
+        if grid[y].count(n) != 1: #continue only if the number appears only once in the row. Otherwise, false
+            return False
+        
+        #check along the x axis
+        nCount = 0
+        for row in grid:
+            if row[x] == n:
+                nCount += 1
+        if nCount != 1: #continue only if the number appears only once in the col. Otherwise, false
+                return False
+        
+        nCount = 0
+        #check for the 3x3 square
+        startRow = y - (y % 3)
+        startCol = x - (x % 3)
+        for row in grid[startRow:startRow+3]:            
+            for number in row[startCol:startCol+3]:
+                if number == n:
+                    nCount += 1
+        if nCount != 1: #continue only if the number appears only once in the square.
+            return False
+        
+        return True
         
     def solve(self, animation=False): #Specify whether to display how it was solved
         return grid
-        
+    
+    def check(self):
+        for row in range(9):
+            for col in range(9):
+                if not self.noDuplicates(row, col, grid[row][col]):
+                    print(row, col, grid[row][col])
+                    return False
+        return True
     
     def hint(self):
         pass
@@ -227,25 +263,25 @@ def run():
         #O                        O
         #L                        L
         #0                        8
-        [9, 8, 0, 0, 0, 0, 0, 0, 0],        #ROW 0
-        [0, 0, 3, 0, 0, 0, 0, 0, 0],
-        [1, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 6, 0, 0, 0, 0],
-        [0, 4, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 1, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 2, 0, 0, 9, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 9],        #ROW 8
+        [0, 3, 5, 2, 6, 9, 7, 8, 1],        #ROW 0
+        [6, 8, 2, 5, 7, 1, 4, 9, 3],
+        [1, 9, 7, 8, 3, 4, 5, 6, 2],
+        [8, 2, 6, 1, 9, 5, 3, 4, 7],
+        [3, 7, 4, 6, 8, 2, 9, 1, 5],
+        [9, 5, 1, 7, 4, 3, 6, 2, 8],
+        [5, 1, 9, 3, 2, 6, 8, 7, 4],
+        [2, 4, 8, 9, 5, 7, 1, 3, 6],
+        [7, 6, 3, 4, 1, 8, 2, 5, 9],        #ROW 8
     ]
     
     mySudoku = Sudoku(grid, 540) #for best results, should be a multiple of 9
     mySudoku.draw()
     
-    assert mySudoku.isPossible(0, 2, 9) == False, "it's false by horizontal!"
-    assert mySudoku.isPossible(0, 2, 1) == True, "it's true by horizontal!"
-    assert mySudoku.isPossible(3, 3, 4) == True
-    assert mySudoku.isPossible(3, 3, 6) == False, "it's false by vertical!"
-    print(mySudoku.isPossible(8, 8, 6))
+    #assert mySudoku.isPossible(0, 2, 9) == False, "it's false by horizontal!"
+    #assert mySudoku.isPossible(0, 2, 1) == True, "it's true by horizontal!"
+    #assert mySudoku.isPossible(3, 3, 4) == True
+    #assert mySudoku.isPossible(3, 3, 6) == False, "it's false by vertical!"
+    #print(mySudoku.isPossible(8, 8, 6))
 
     print(f"Each little square is {mySudoku.squareSize} big.")
     print(f"The top left of the square is at {mySudoku.xLeft}, {mySudoku.yTop}")
@@ -258,7 +294,7 @@ def run():
     checkButton.draw(400, 680)
     
     generateButton = Button(WHITE, text="Generate", fontSize = 24, widthScale=1.5)
-    generateButton.draw(300, 100)
+    generateButton.draw(300, 50)
     
     while True:
         for event in pygame.event.get():
@@ -294,8 +330,10 @@ def run():
                     print("Filled: ", filled)
                     #TODO: If filled is True, mySudoku.check()
                     if filled:
-                        #mySudoku.check()
-                        pass
+                        if mySudoku.check():
+                            print("Congratulations! That is correct!")
+                        else:
+                            print("Try again.")
                     
             if event.type == pygame.KEYDOWN:
                 if (event.unicode.isnumeric() or event.key == pygame.K_BACKSPACE) and mySudoku.squareSelected and event.unicode != "0" and not mySudoku.originalSquare():
