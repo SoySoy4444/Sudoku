@@ -69,16 +69,67 @@ class Sudoku:
         pass
     
     def solve(self, animation=False): #Specify whether to display how it was solved
-        pass
+        return grid
         
     def update(self):
         pass
     
-    def hint(self, square):
+    def hint(self):
         pass
     
     def generate(self):
         pass
     
     def draw(self):
-        pass
+        screen.fill(GREY)
+        verticalOffset = (windowSize[0] - self.gridSize) // 2 #distance from the vertical edge of the screen to the vertical edge of the grid
+        horizontalOffset = (windowSize[1] - self.gridSize) // 2
+        
+        self.xLeft, self.xRight = verticalOffset, windowSize[0]-verticalOffset
+        self.yTop, self.yBottom = horizontalOffset, windowSize[1]-horizontalOffset
+        
+        currentXPosition = self.xLeft #start from the left of the grid
+        destinationXPosition = self.xRight
+        currentYPosition = self.yTop
+        destinationYPosition = self.yBottom
+        
+        #horizontal      
+        for x in range(10): #10 lines needed to produce 9 boxes
+            colour = BLACK if x % 3 == 0 else WHITE
+            pygame.draw.line(screen, colour, (currentXPosition, currentYPosition), (destinationXPosition, currentYPosition), 1) #horizontal line
+            
+            currentYPosition += self.squareSize
+
+        #vertical
+        currentYPosition = self.yTop #reset currentYPosition
+        for y in range(10): #10 lines needed to produce 9 boxes
+            colour = BLACK if y % 3 == 0 else WHITE
+            pygame.draw.line(screen, colour, (currentXPosition, currentYPosition), (currentXPosition, destinationYPosition), 1) #vertical line
+            currentXPosition += self.squareSize
+    
+def run():
+    global grid
+    grid = [
+        [0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    ]
+    
+    mySudoku = Sudoku(grid, 540) #for best results, should be a multiple of 9
+    mySudoku.draw()
+
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+
+        pygame.display.update()
+if __name__ == "__main__":
+    run()
