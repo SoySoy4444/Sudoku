@@ -86,14 +86,29 @@ class Sudoku:
             self.fontSize -= 1
         print("Font size found: ", self.fontSize)
     
-    def isPossible(self):
-        pass
-    
+    #accepts a GRID coordinate like 7, 6. Checks if it is valid to play a number N at x, y.
+    def isPossible(self, y, x, n):
+        #check along the y axis
+        if n in grid[y]:
+            return False
+        
+        #check along the x axis
+        for row in grid:
+            if row[x] == n:
+                return False
+        
+        #check for the 3x3 square
+        startRow = y - (y % 3)
+        startCol = x - (x % 3)
+        for row in grid[startRow:startRow+3]:
+            for number in row[startCol:startCol+3]:
+                if number == n:
+                    return False
+        return True
+        
     def solve(self, animation=False): #Specify whether to display how it was solved
         return grid
         
-    def update(self):
-        pass
     
     def hint(self):
         pass
@@ -138,7 +153,8 @@ class Sudoku:
         self.currentHighLightedSquare = None
         matrix = numpy.matrix(self.grid)
         print(matrix)
-            
+    
+    #accepts a GRID coordinate like 4, 1
     def highlight(self, gridCoordinate):
         
         #the new highlight
@@ -166,7 +182,7 @@ class Sudoku:
         self.currentHighLightedSquare = None
         self.squareSelected = False #a square is no longer selected
     
-        #Something like (431.9, 221.2) to (6, 5)
+    #Converts MOUSE POSITION to GRID COORDINATE. Something like (431.9, 221.2) to (6, 5). 
     def screenCoordinateToGridCoordinate(self, mousePosition):
         mouseX, mouseY = mousePosition
         #if the location clicked is outside the grid
@@ -179,6 +195,7 @@ class Sudoku:
             return int(row), int(col)
             self.squareSelected = True
     
+    #Accepts "" (backspace), "1", "2", "3"..."9", ADDS to the grid
     def addNumber(self, number, colour=BLACK):
         x, y = self.currentHighlightedSquareGridCoordinates() #get the coordinates of the current active square
         
@@ -192,38 +209,57 @@ class Sudoku:
         arialFont = pygame.font.SysFont("arialunicodettf", self.fontSize)
         numberText = arialFont.render(str(number), True, colour)
         screen.blit(numberText, self.currentHighLightedSquare)
-        
+    
+    #Returns the GRID COORDINATES of the CURRENT SELECTED SQUARE
     def currentHighlightedSquareGridCoordinates(self):
         x, y = self.screenCoordinateToGridCoordinate((self.currentHighLightedSquare.x, self.currentHighLightedSquare.y))
         return x, y
     
-    def notOriginalSquare(self):
+    #Returns whether the current SELECTED square is a clue square
+    def originalSquare(self):
         x, y = self.screenCoordinateToGridCoordinate((self.currentHighLightedSquare.x, self.currentHighLightedSquare.y))
-        return self.originalGrid[y][x] == 0
+        return self.originalGrid[y][x] != 0
         
 def run():
     global grid
     grid = [
-        [9, 8, 0, 0, 0, 0, 0, 0, 0],
+        #C                        C
+        #O                        O
+        #L                        L
+        #0                        8
+        [9, 8, 0, 0, 0, 0, 0, 0, 0],        #ROW 0
         [0, 0, 3, 0, 0, 0, 0, 0, 0],
         [1, 0, 0, 0, 0, 0, 0, 0, 0],
         [0, 0, 0, 0, 6, 0, 0, 0, 0],
         [0, 4, 0, 0, 0, 0, 0, 0, 0],
         [0, 0, 0, 0, 0, 1, 0, 0, 0],
         [0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 2, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 2, 0, 0, 9, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 9],        #ROW 8
     ]
     
     mySudoku = Sudoku(grid, 540) #for best results, should be a multiple of 9
     mySudoku.draw()
     
+    assert mySudoku.isPossible(0, 2, 9) == False, "it's false by horizontal!"
+    assert mySudoku.isPossible(0, 2, 1) == True, "it's true by horizontal!"
+    assert mySudoku.isPossible(3, 3, 4) == True
+    assert mySudoku.isPossible(3, 3, 6) == False, "it's false by vertical!"
+    print(mySudoku.isPossible(8, 8, 6))
+
     print(f"Each little square is {mySudoku.squareSize} big.")
     print(f"The top left of the square is at {mySudoku.xLeft}, {mySudoku.yTop}")
     print(f"The bottom right of the square is at {mySudoku.xRight}, {mySudoku.yBottom}")
     
-    print(grid)
-
+    solveButton = Button(WHITE, text="Solve", fontSize = 24, widthScale=1.5)
+    solveButton.draw(200, 680)
+    
+    checkButton = Button(WHITE, text="Check", fontSize = 24, widthScale=1.5)
+    checkButton.draw(400, 680)
+    
+    generateButton = Button(WHITE, text="Generate", fontSize = 24, widthScale=1.5)
+    generateButton.draw(300, 100)
+    
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -233,16 +269,36 @@ def run():
             if event.type == pygame.MOUSEBUTTONDOWN:
                 mousePosition = pygame.mouse.get_pos()
                 coordinates = mySudoku.screenCoordinateToGridCoordinate(mousePosition)
-                print(coordinates)
-                
+                                
                 if coordinates: #if the place clicked is INSIDE the grid, then
                     mySudoku.unhighlight()
                     mySudoku.highlight(coordinates) #highlight the new square
                 else: #coordinates == False and the place is OUTSIDE the grid
                     mySudoku.unhighlight() #unhighlight
 
+                if solveButton.isMouseHover(mousePosition):
+                    #grid = mySudoku.solve()
+                    #print(grid)
+                    pass
+                if checkButton.isMouseHover(mousePosition):
+                    #check if all squares have been filled
+                    filled = True
+                    for row in grid:
+                        for num in row:
+                            if num == 0:
+                                filled = False
+                                break
+                        if not filled:
+                            break
+                        
+                    print("Filled: ", filled)
+                    #TODO: If filled is True, mySudoku.check()
+                    if filled:
+                        #mySudoku.check()
+                        pass
+                    
             if event.type == pygame.KEYDOWN:
-                if (event.unicode.isnumeric() or event.key == pygame.K_BACKSPACE) and mySudoku.squareSelected and event.unicode != "0" and mySudoku.notOriginalSquare():
+                if (event.unicode.isnumeric() or event.key == pygame.K_BACKSPACE) and mySudoku.squareSelected and event.unicode != "0" and not mySudoku.originalSquare():
                     mySudoku.addNumber(event.unicode)
                     print(grid)
 
