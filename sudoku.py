@@ -1,4 +1,4 @@
-import pygame, sys, numpy
+import pygame, sys, numpy, copy
 
 pygame.init()
 global windowSize, screen
@@ -10,6 +10,7 @@ BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 GREY = (220, 220, 220)
 YELLOW = (255, 255, 237)
+RED = (255, 0, 0)
 
 class Button():
     #width and height will only be passed in for buttons with no text (images and plain buttons)
@@ -61,6 +62,7 @@ class Button():
 class Sudoku:
     def __init__(self, grid, gridSize, lineThickness=1):
         self.grid = grid
+        self.originalGrid = copy.deepcopy(grid)
         self.gridSize = gridSize
         self.squareSize = gridSize//9
         self.lineThickness = lineThickness
@@ -74,8 +76,6 @@ class Sudoku:
         self.yTop, self.yBottom = self.horizontalOffset, windowSize[1]-self.horizontalOffset
         
         
-        
-        
         self.fontSize = 100 #starting font size, adjust until correct font size found
 
         arialFont = pygame.font.SysFont("arialunicodettf", self.fontSize)
@@ -83,9 +83,8 @@ class Sudoku:
         while fontWidth > self.squareSize or fontHeight > self.squareSize:
             arialFont = pygame.font.SysFont("arialunicodettf", self.fontSize)
             fontWidth, fontHeight = arialFont.size("0")
-            print("Finding size", self.fontSize)
             self.fontSize -= 1
-        print(self.fontSize)
+        print("Font size found: ", self.fontSize)
     
     def isPossible(self):
         pass
@@ -126,6 +125,20 @@ class Sudoku:
             pygame.draw.line(screen, colour, (currentXPosition, currentYPosition), (currentXPosition, destinationYPosition), self.lineThickness) #vertical line
             currentXPosition += self.squareSize #move on to the next vertical line, to the right of the grid
     
+        for row in range(9):
+            for col in range(9):
+                if self.grid[col][row] != 0: #num is one of the original clues
+                    top = int(self.yTop + (col * self.squareSize))
+                    left = int(self.xLeft + (row * self.squareSize))
+                    
+                    region = pygame.Rect(left+self.lineThickness, top+self.lineThickness, self.squareSize-self.lineThickness, self.squareSize-self.lineThickness) #the square to cover with blue
+                    self.currentHighLightedSquare = region
+                    self.addNumber(str(self.grid[col][row]), colour=RED)
+        
+        self.currentHighLightedSquare = None
+        matrix = numpy.matrix(self.grid)
+        print(matrix)
+            
     def highlight(self, gridCoordinate):
         
         #the new highlight
@@ -142,9 +155,14 @@ class Sudoku:
             screen.fill(GREY, rect=self.currentHighLightedSquare)
             highlightedSquareX, highlightedSquareY = self.currentHighlightedSquareGridCoordinates()
             
-            #if we unhighlighted a square that had a number inside, then we need to undo. 
-            if grid[highlightedSquareY][highlightedSquareX] != 0:
-                self.addNumber(self.previousNumber)
+            #If we unhighlighted an original square,
+            if self.originalGrid[highlightedSquareY][highlightedSquareX] != 0:
+                self.addNumber(str(self.originalGrid[highlightedSquareY][highlightedSquareX]), colour=RED)
+            #if we unhighlighted a square that had a non-original number inside, then we need to undo. 
+            elif grid[highlightedSquareY][highlightedSquareX] != 0:
+                self.addNumber(grid[highlightedSquareY][highlightedSquareX])
+            #otherwise, there was never a number in the first place, so it doesn't matter
+            
         self.currentHighLightedSquare = None
         self.squareSelected = False #a square is no longer selected
     
@@ -161,35 +179,39 @@ class Sudoku:
             return int(row), int(col)
             self.squareSelected = True
     
-    def addNumber(self, number):
-        x, y = self.currentHighlightedSquareGridCoordinates()
-        grid[y][x] = number #TODO: Opposite is better. Check why.
-        print("Added", number, "to", x, y)
+    def addNumber(self, number, colour=BLACK):
+        x, y = self.currentHighlightedSquareGridCoordinates() #get the coordinates of the current active square
+        
+        if number == "": #if user pressed BACKSPACE
+            number = "0" #reset the square to 0
+        grid[y][x] = int(number) #TODO: Opposite is better. Check why.
+        print(number)
+        if number == "0": #backspace
+            number = " "
         
         arialFont = pygame.font.SysFont("arialunicodettf", self.fontSize)
-        numberText = arialFont.render(number, True, BLACK)
+        numberText = arialFont.render(str(number), True, colour)
         screen.blit(numberText, self.currentHighLightedSquare)
-        
-        self.previousNumber = number
-        
-        matrix = numpy.matrix(grid)
-        print(matrix)
         
     def currentHighlightedSquareGridCoordinates(self):
         x, y = self.screenCoordinateToGridCoordinate((self.currentHighLightedSquare.x, self.currentHighLightedSquare.y))
         return x, y
+    
+    def notOriginalSquare(self):
+        x, y = self.screenCoordinateToGridCoordinate((self.currentHighLightedSquare.x, self.currentHighLightedSquare.y))
+        return self.originalGrid[y][x] == 0
         
 def run():
     global grid
     grid = [
+        [9, 8, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 3, 0, 0, 0, 0, 0, 0],
+        [1, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 6, 0, 0, 0, 0],
+        [0, 4, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 1, 0, 0, 0],
         [0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 2, 0, 0, 0, 0],
         [0, 0, 0, 0, 0, 0, 0, 0, 0],
     ]
     
@@ -199,6 +221,8 @@ def run():
     print(f"Each little square is {mySudoku.squareSize} big.")
     print(f"The top left of the square is at {mySudoku.xLeft}, {mySudoku.yTop}")
     print(f"The bottom right of the square is at {mySudoku.xRight}, {mySudoku.yBottom}")
+    
+    print(grid)
 
     while True:
         for event in pygame.event.get():
@@ -218,9 +242,9 @@ def run():
                     mySudoku.unhighlight() #unhighlight
 
             if event.type == pygame.KEYDOWN:
-                if event.unicode.isnumeric() and mySudoku.squareSelected:
-                    print(event.unicode)
+                if (event.unicode.isnumeric() or event.key == pygame.K_BACKSPACE) and mySudoku.squareSelected and event.unicode != "0" and mySudoku.notOriginalSquare():
                     mySudoku.addNumber(event.unicode)
+                    print(grid)
 
                 
         pygame.display.update()
