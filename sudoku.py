@@ -1,4 +1,4 @@
-import pygame, sys
+import pygame, sys, numpy
 
 pygame.init()
 global windowSize, screen
@@ -72,6 +72,20 @@ class Sudoku:
         
         self.xLeft, self.xRight = self.verticalOffset, windowSize[0]-self.verticalOffset
         self.yTop, self.yBottom = self.horizontalOffset, windowSize[1]-self.horizontalOffset
+        
+        
+        
+        
+        self.fontSize = 100 #starting font size, adjust until correct font size found
+
+        arialFont = pygame.font.SysFont("arialunicodettf", self.fontSize)
+        fontWidth, fontHeight = arialFont.size("0")
+        while fontWidth > self.squareSize or fontHeight > self.squareSize:
+            arialFont = pygame.font.SysFont("arialunicodettf", self.fontSize)
+            fontWidth, fontHeight = arialFont.size("0")
+            print("Finding size", self.fontSize)
+            self.fontSize -= 1
+        print(self.fontSize)
     
     def isPossible(self):
         pass
@@ -126,6 +140,11 @@ class Sudoku:
     def unhighlight(self):
         if self.currentHighLightedSquare: #if a square is currently highlighted already,
             screen.fill(GREY, rect=self.currentHighLightedSquare)
+            highlightedSquareX, highlightedSquareY = self.currentHighlightedSquareGridCoordinates()
+            
+            #if we unhighlighted a square that had a number inside, then we need to undo. 
+            if grid[highlightedSquareY][highlightedSquareX] != 0:
+                self.addNumber(self.previousNumber)
         self.currentHighLightedSquare = None
         self.squareSelected = False #a square is no longer selected
     
@@ -141,6 +160,24 @@ class Sudoku:
             col = (mouseY - self.yTop) // ((self.yBottom - self.yTop)/9)  #calculate the col number from 0 - 8
             return int(row), int(col)
             self.squareSelected = True
+    
+    def addNumber(self, number):
+        x, y = self.currentHighlightedSquareGridCoordinates()
+        grid[y][x] = number #TODO: Opposite is better. Check why.
+        print("Added", number, "to", x, y)
+        
+        arialFont = pygame.font.SysFont("arialunicodettf", self.fontSize)
+        numberText = arialFont.render(number, True, BLACK)
+        screen.blit(numberText, self.currentHighLightedSquare)
+        
+        self.previousNumber = number
+        
+        matrix = numpy.matrix(grid)
+        print(matrix)
+        
+    def currentHighlightedSquareGridCoordinates(self):
+        x, y = self.screenCoordinateToGridCoordinate((self.currentHighLightedSquare.x, self.currentHighLightedSquare.y))
+        return x, y
         
 def run():
     global grid
@@ -179,10 +216,11 @@ def run():
                     mySudoku.highlight(coordinates) #highlight the new square
                 else: #coordinates == False and the place is OUTSIDE the grid
                     mySudoku.unhighlight() #unhighlight
-                    
+
             if event.type == pygame.KEYDOWN:
                 if event.unicode.isnumeric() and mySudoku.squareSelected:
                     print(event.unicode)
+                    mySudoku.addNumber(event.unicode)
 
                 
         pygame.display.update()
